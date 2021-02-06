@@ -1,0 +1,879 @@
+import sys
+import os
+import cv2
+import PySide2
+from PySide2.QtWidgets import *
+from PySide2.QtGui import *
+from PySide2.QtCore import *
+from PySide2.QtWebEngineWidgets import *
+from PySide2.QtCore import QThread, QPointF, Signal
+from OpenGL.GLU import *
+from OpenGL.GL import *
+from PIL import Image
+from serial import Serial
+from time import sleep, time
+from datetime import datetime
+from shutil import copyfile
+from pyqtgraph import PlotWidget, AxisItem, mkPen, setConfigOptions, PlotItem, mkBrush
+import qimage2ndarray
+from math import cos, sin, sqrt
+import numpy as np
+import serial.tools.list_ports as lsp
+
+small_font = QFont("Sans-serif")
+small_font.setPixelSize(7)
+setConfigOptions(antialias=True)
+telemetry = {
+    "Alt": (0, 2, 10),
+    "Basınç": (0, 3, 3),
+    "Yükseklik": (1, 3, 4),
+    "Sıcaklık": (2, 3, 6),
+    "İniş Hızı": (3, 3, 5),
+    "Statü": (4, 3, 15),
+    "Pil Gerilimi": (0, 1, 7),
+    "Pitch": (5, 3, 12),
+    "Roll": (5, 2, 13),
+    "Yaw": (5, 1, 14),
+}
+status = [
+    "Başlangıç",
+    "Yükseliş",
+    "Ayrılma",
+    "Alçalış",
+    "Yere İniş",
+    "Kurtarma",
+    "Veri Toplama",
+    "PFR"
+]
+PATH_TELEMETRY = "telemetry"
+PATH_VIDEOS = "videos"
+PATH_TELEMETRY_LATEST = os.path.join(PATH_TELEMETRY, "latest.csv")
+PATH_VIDEOS_RLATEST = os.path.join(PATH_VIDEOS, "rlatest.avi")
+PATH_VIDEOS_LATEST = os.path.join(PATH_VIDEOS, "latest.avi")
+
+
+class MainWindow(QMainWindow):
+    def __init__(self, parent=None):
+        super(MainWindow, self).__init__(parent)
+        self.setWindowTitle("Göksat 1 Yer İstasyonu Yazılımı")
+        self.setWindowIcon(QIcon('assets/icon.ico'))
+        self.setGeometry(0, 0, 1366, 768-24)
+        self.maximumSize = (1366, 768-24)
+        self.minimumSize = (1366, 768-24)
+        self.graphs = [None]*(max(map(lambda x: x[2], telemetry.values()))+1)
+        for t, p in telemetry.items():
+            self.addGraph(t, p)
+        self.navball = self.addWidget(Navball(), 570, 543, 795, 767)
+        self.player = self.addWidget(Player(), 190, 24, 1175, 542)
+        self.nav2d = self.addWidget(Nav2D(), 1175, 119, 1365, 308)
+        self.gpsmap = self.addWidget(GpsMap(), 0, 119, 190, 308)
+        label = self.addWidget(QLabel(), 15, 32, 175, 112)
+        label.setPixmap(QPixmap("assets/goksat.bmp"))
+        label.setScaledContents(True)
+        self.addText("Takım No: ", "50626", 1165, 24, 1360, 53, 1267, True)
+        self.status_text = self.addText(
+            "Uydu Statüsü: ", "-", 1165, 55, 1360, 84, 1267, True)
+        self.time_text = self.addText(
+            "Geçen Süre: ", "-", 1165, 86, 1360, 115, 1267, True)
+        self.port_text = self.addWidget(QComboBox(self), 274, 547, 411, 576)
+        ports = ["debug", "latest"] + \
+            list(map(lambda ps: list(ps)[0], lsp.comports()))
+        self.port_text = self.addCombobox(
+            "Port: ", ports, 191, 547, 411, 576, 274, True)
+        self.pcount_text = self.addText(
+            "Paket Sayısı: ", "-", 191, 581, 411, 610, 274, True)
+        self.connect_button = self.addButton(
+            "Bağlan", 414, 547, 565, 576, self.toggle_connection)
+        self.addButton("Manual Ayrılma", 414, 581, 565, 610, self.send_cmd)
+        self.video_text = self.addText(
+            "Video Konumu: ", "/home/shady/Other/goksat/final/latest.avi", 799, 547, 1138, 576, 904, alignment=Qt.AlignLeft)
+        self.video_stream_button = self.addButton(
+            "Başlat", 800, 580, 906, 609, self.video_stream)
+        self.progresbar = self.addWidget(QProgressBar(), 922, 579, 1170, 610)
+        self.progresbar.setValue(0)
+        self.addButton("...", 1141, 547, 1170, 576, self.select_path)
+        self.tth = None
+        self.setAcceptDrops(True)
+
+    def addWidget(self, item, x1, y1, x2, y2):
+        item.setGeometry(x1, y1-24, x2-x1+1, y2-y1+1)
+        item.setParent(self)
+        return item
+
+    def addGraph(self, name, p):
+        graph = self.addWidget(
+            CustomGraph(name), 0 + 190*p[0] + 225*(p[0] > 2), 155 + 153*p[1], 190 + 190*p[0] + 225*(p[0] > 2), 308 + 153*p[1])
+        self.graphs[p[2]] = graph
+        return graph
+
+    def addButton(self, text, x1, y1, x2, y2, callback=None):
+        r = self.addWidget(QPushButton(text=text), x1, y1, x2, y2)
+        if callback:
+            r.clicked.connect(callback)
+        return r
+
+    def addText(self, label_text, text, x1, y1, x2, y2, x3, disabled=False, alignment=Qt.AlignCenter):
+        ledit = self.addWidget(QLineEdit(), x3, y1, x2, y2)
+        ledit.setText(text)
+        ledit.setAlignment(alignment)
+        ledit.setReadOnly(disabled)
+        label = self.addWidget(QLabel(), x1, y1, x3, y2)
+        label.setText(label_text)
+        label.setAlignment(Qt.AlignRight)
+        return ledit
+
+    def addCombobox(self, label_text, items, x1, y1, x2, y2, x3, disabled=False, alignment=Qt.AlignCenter):
+        comb = self.addWidget(QComboBox(), x3, y1, x2, y2)
+        comb.addItems(items)
+        comb.setEditable(True)
+        comb.lineEdit().setReadOnly(disabled)
+        comb.lineEdit().setAlignment(alignment)
+        label = self.addWidget(QLabel(), x1, y1, x3, y2)
+        label.setText(label_text)
+        label.setAlignment(Qt.AlignRight)
+        return comb
+
+    def select_path(self):
+        r = QFileDialog.getOpenFileName(
+            self, "Video dosyasını aç", None, "Video Files (*.mp4 *.avi *.webm)")
+        if r and r[0] != "":
+            self.video_text.setText(r[0])
+
+    def toggle_connection(self):
+        if not self.tth or self.tth.isFinished():
+            self.pcount = 0
+            self.tth = TelemetryThread(self)
+            self.tth.changeTelemetry.connect(self.update_ui)
+            self.player.select_index(self.port_text.currentText())
+            if not self.tth.start_at_port(self.port_text.currentText()):
+                QMessageBox.critical(
+                    self, "Yer İstasyonu Yazılımı", "Seçilen port ile bağlantı kurulamadı")
+                self.tth = None
+                return
+            self.start_date = datetime.today()
+            self.connect_button.setText("Durdur")
+            self.player.start_video()
+        elif self.tth:
+            self.tth.stop()
+            self.tth = None
+            self.player.stop_video()
+            self.connect_button.setText("Baglan")
+
+    def cleanup(self):
+        if self.tth:
+            self.tth.stop()
+            self.tth = None
+            self.player.stop_video()
+
+    def update_ui(self):
+        self.pcount += 1
+        r = self.tth.data
+        for p in telemetry.values():
+            g = self.graphs[p[2]]
+            g.x = r[1]
+            g.y = r[p[2]]
+            g.plot()
+        self.pcount_text.setText(str(self.pcount))
+        self.navball.setAngle(r[12][-1], r[13][-1], r[14][-1])
+        self.nav2d.setAngle(r[12][-1], r[13][-1], r[14][-1])
+        self.gpsmap.setLocation(r[8][-1], r[9][-1])
+        delta = datetime.now()-self.start_date
+        delta = datetime(2000, 1, 1) + delta
+        self.time_text.setText(f"{delta.minute:02} : {delta.second:02}")
+        self.status_text.setText(status[r[11][-1]])
+        if self.tth.perc == 99:
+            self.tth.perc = 100
+        self.progresbar.setValue(self.tth.perc)
+
+    def dragEnterEvent(self, e):
+        if e.mimeData().hasUrls():
+            e.acceptProposedAction()
+
+    def dropEvent(self, e):
+        for url in e.mimeData().urls():
+            file_name = url.toLocalFile()
+            self.port_text.addItem(file_name)
+
+    def send_cmd(self):
+        if self.tth:
+            self.tth.cmd = True
+
+    def video_stream(self):
+        path = self.video_text.text()
+        if os.path.isfile(path):
+            if self.tth:
+                self.tth.start_stream(path)
+            else:
+                QMessageBox.critical(
+                    self, "Yer İstasyonu Yazılımı", "Bağlantı açık değil!")
+        else:
+            QMessageBox.critical(self, "Yer İstasyonu Yazılımı",
+                                 "Seçilen video dosyası bulunamadı")
+
+
+class CustomGraph(QGroupBox):
+    def __init__(self, title, *args, **kargs):
+        QGroupBox.__init__(self)
+        palette = self.palette()
+        bgcolor = palette.color(self.backgroundRole())
+        bcolor = palette.color(QPalette.Base)
+        fgcolor = palette.color(QPalette.WindowText)
+        self.hcolor = palette.color(QPalette.Active, QPalette.Highlight)
+        self.graph = PlotWidget(self, title=title, *args, **kargs)
+        self.graph.plotItem.vb.setBackgroundColor(bcolor)
+        r = self.geometry()
+        self.graph.setGeometry(2, 2, r.width()-4-17, r.height()-4)
+        self.graph.setTitle(
+            "<span style=\"color:{};font-family:Sans-serif;font-size:7pt\">{}</span>".format(fgcolor.name(), title))
+        self.graph.setBackground(bgcolor)
+        self.setStyleSheet("background-color:{};".format(bgcolor.name()))
+        l = self.graph.getAxis("left")
+        b = self.graph.getAxis("bottom")
+        t = self.graph.getAxis("top")
+        r = self.graph.getAxis("right")
+        self.graph.showAxis('top')
+        self.graph.showAxis('right')
+        t.style['showValues'] = False
+        r.style['showValues'] = False
+        l.tickFont = small_font
+        b.tickFont = small_font
+        pen = mkPen(fgcolor, width=1)
+        l.setTextPen(pen)
+        b.setTextPen(pen)
+        l.setStyle(tickTextOffset=2)
+        b.setStyle(tickTextOffset=0)
+        l.setZValue(0)
+        b.setZValue(0)
+        t.setZValue(0)
+        r.setZValue(0)
+        l.setPen(pen)
+        b.setPen(pen)
+        t.setPen(pen)
+        r.setPen(pen)
+        l.style['tickLength'] = 5
+        b.style['tickLength'] = 5
+        t.style['tickLength'] = 0
+        r.style['tickLength'] = 0
+        l.setWidth(18)
+        self.x = []
+        self.y = []
+        self.range = [-1, 1]
+        self.plotdata = None
+
+    def resizeEvent(self, e):
+        QGroupBox.resizeEvent(self, e)
+        r = self.geometry()
+        self.graph.setGeometry(2, 2, r.width()-4-17, r.height()-4)
+
+    def plot(self):
+        rn = self.range
+        x = self.x
+        y = self.y
+        if not self.plotdata:
+            self.plotdata = self.graph.plot(
+                x, y, pen=mkPen(color=self.hcolor, width=2))
+        while y[-1] > rn[1]:
+            rn[1] *= 2
+        while y[-1] < rn[0]:
+            rn[0] *= 2
+        self.graph.plotItem.setRange(
+            xRange=(0, (x[-1]//20+1)*20), yRange=rn, disableAutoRange=True)
+        self.plotdata.setData(x, y)
+
+
+class Navball(QGroupBox):
+    def __init__(self):
+        QGroupBox.__init__(self)
+        self.glw = NavballGL(self)
+        r = self.geometry()
+        self.glw.setGeometry(2, 2, r.width()-4, r.height()-4)
+        self.cursor = QLabel(self)
+        color = self.palette().color(QPalette.Highlight)
+        mask = cv2.imread("assets/cursor_mask.png", cv2.IMREAD_UNCHANGED)
+        mask2 = cv2.cvtColor(mask, cv2.COLOR_BGR2HLS)
+        mask2[:, :, 0] = color.hslHue()/2
+        mask2[:, :, 2] = color.hslSaturation()
+        mask2 = cv2.cvtColor(mask2, cv2.COLOR_HLS2BGR)
+        mask[:, :, 0:3] = mask2
+        cv2.imwrite('assets/cursor_blended.png', mask)
+        self.cursor.setPixmap(QPixmap("assets/cursor_blended.png"))
+        self.cursor.setGeometry(2, 2, r.width()-4, r.height()-4)
+        self.cursor.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+
+    def resizeEvent(self, e):
+        QGroupBox.resizeEvent(self, e)
+        r = self.geometry()
+        self.glw.setGeometry(2, 2, r.width()-4, r.height()-4)
+        self.cursor.setGeometry(2, 2, r.width()-4, r.height()-4)
+
+    def setAngle(self, x, y, z):
+        self.glw.angle[0] = x
+        self.glw.angle[1] = y
+        self.glw.angle[2] = z
+        self.glw.update()
+
+
+class NavballGL(QOpenGLWidget):
+    def __init__(self, parent):
+        QOpenGLWidget.__init__(self, parent)
+        r = self.geometry()
+        self.width = r.width()
+        self.height = r.height()
+        self.angle = [0, 0, 0]
+
+    def initializeGL(self):
+        color = self.palette().color(QPalette.Window)
+        P = 1
+        glClearColor(color.redF(), color.greenF(), color.blueF(), 1)
+        glEnable(GL_MULTISAMPLE)
+        glShadeModel(GL_SMOOTH)
+        glEnable(GL_CULL_FACE)
+        glEnable(GL_DEPTH_TEST)
+        glEnable(GL_LIGHTING)
+        lightZeroPosition = [10., 4., 10., 1.]
+        lightZeroColor = [0.8, 1.0, 0.8, 1.0]
+        glLightfv(GL_LIGHT0, GL_POSITION, lightZeroPosition)
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, lightZeroColor)
+        glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 0.1)
+        glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, 0.05)
+        glEnable(GL_LIGHT0)
+        mask = cv2.imread("assets/navball_mask.png")
+        mask = cv2.cvtColor(mask, cv2.COLOR_BGR2HLS)
+        mask[:, :, 0] = color.hslHue()/2
+        mask[:, :, 2] = color.hslSaturation()
+        mask[:, :, 1] = (255*(mask[:, :, 1]/255.0)**P).astype(np.uint8)
+        mask = cv2.cvtColor(mask, cv2.COLOR_HLS2BGR)
+        cv2.imwrite('assets/navball_blended.png', mask)
+        img = Image.open("assets/navball_blended.png")
+        img_data = np.array(list(img.getdata()), np.int8)
+        self.tex = glGenTextures(1)
+        glBindTexture(GL_TEXTURE_2D, self.tex)
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST)
+        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST)
+        glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_DECAL)
+        fmt = GL_RGB if img.mode == "RGB" else GL_RGBA
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img.size[0], img.size[1], 0,
+                     fmt, GL_UNSIGNED_BYTE, img_data)
+
+    def paintGL(self):
+        w, h = self.width, self.height
+        glEnable(GL_MULTISAMPLE)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glPushMatrix()
+        qobj = gluNewQuadric()
+        gluQuadricTexture(qobj, GL_TRUE)
+        glEnable(GL_TEXTURE_2D)
+        glBindTexture(GL_TEXTURE_2D, self.tex)
+        glRotatef(self.angle[2] + 180, 0, 0, 1)
+        glRotatef(-self.angle[0], 1, 0, 0)
+        glRotatef(self.angle[1], 0, 1, 0)
+        gluSphere(qobj, 3.2, 360, 360)
+        gluDeleteQuadric(qobj)
+        glDisable(GL_TEXTURE_2D)
+        glPopMatrix()
+
+    def resizeGL(self, w, h):
+        self.width = w
+        self.height = h
+        glViewport(0, 0, w, h)
+        glMatrixMode(GL_PROJECTION)
+        gluPerspective(40., 1., 1., 40.)
+        glMatrixMode(GL_MODELVIEW)
+        gluLookAt(0, 0, 10,
+                  0, 0, 0,
+                  0, 1, 0)
+        glPushMatrix()
+
+
+class Nav2D(QGroupBox):
+    def __init__(self):
+        QGroupBox.__init__(self)
+        r = self.geometry()
+        self.width = r.width()
+        self.height = r.height()
+        self.angle = [0, 0, 0]
+        self.fg15 = mkPen(
+            width=1.5, color=self.palette().color(QPalette.WindowText))
+        self.fg05 = mkPen(
+            width=0.5, color=self.palette().color(QPalette.WindowText))
+        self.hg = mkBrush(color=self.palette().color(
+            QPalette.Active, QPalette.Highlight))
+        self.bsbr = mkBrush(color=self.palette().color(QPalette.Base))
+
+    def setAngle(self, x, y, z):
+        self.angle[0] = x
+        self.angle[1] = z
+        self.angle[2] = y
+        self.update()
+
+    def paintEvent(self, e):
+        QGroupBox.paintEvent(self, e)
+        x = self.angle[0]*0.0174532925
+        y = self.angle[1]*0.0174532925
+        z = self.angle[2]*0.0174532925
+        ps = [[-0.7, -1, 0], [0.7, -1, 0], [0.7, 1, 0], [-0.7, 1, 0],
+              [-0.6, -0.5, 0], [0.6, -0.5, 0], [0.6, 0.9, 0], [-0.6, 0.9, 0],
+              [-0.67, -0.6, 0], [0.67, -0.6, 0],
+              [0, -0.7, 0], [0, -0.5, 0]]
+        for p in ps:
+            a0 = sin(z)*p[1]+cos(z)*p[0]
+            a1 = cos(z)*p[1]-sin(z)*p[0]
+            xp = cos(y)*a0
+            yp = sin(x)*sin(y)*a0+cos(x)*a1
+            zp = cos(x)*sin(y)*a0-sin(x)*a1
+            p[0] = xp
+            p[1] = yp
+            p[2] = zp
+        sq2 = sqrt(2)
+        ln = [(0, 1), (1, 2), (2, 3), (3, 0)]
+        w = self.geometry().width()
+        m = 10
+        a = (w - 2*m) / (2*sq2)
+        A = 0.4
+        for p in ps:
+            z = A*(p[2]+1+sq2)-A+1
+            p[0] = ((p[0]/z+sq2)*a+m)
+            p[1] = ((p[1]/z+sq2)*a+m)
+        pn = QPainter(self)
+        pn.setRenderHint(QPainter.Antialiasing, bool=True)
+        poly = QPolygonF()
+        for i in range(0, 4):
+            poly.append(QPointF(ps[i][0], ps[i][1]))
+        pn.setPen(self.fg15)
+        pn.setBrush(self.bsbr)
+        pn.drawPolygon(poly)
+        poly = QPolygonF()
+        for i in range(4, 8):
+            poly.append(QPointF(ps[i][0], ps[i][1]))
+        pn.setPen(Qt.NoPen)
+        pn.setBrush(self.hg)
+        pn.drawPolygon(poly)
+        poly = QPolygonF()
+        for i in range(8, 10):
+            poly.append(QPointF(ps[i][0], ps[i][1]))
+        pn.setPen(self.fg05)
+        pn.setBrush(Qt.NoBrush)
+        pn.drawPolygon(poly)
+        poly = QPolygonF()
+        for i in range(10, 12):
+            poly.append(QPointF(ps[i][0], ps[i][1]))
+        pn.setPen(self.fg05)
+        pn.setBrush(Qt.NoBrush)
+        pn.drawPolygon(poly)
+
+
+class Player(QGroupBox):
+    def __init__(self):
+        QGroupBox.__init__(self)
+        r = self.geometry()
+        self.width = r.width()
+        self.height = r.height()
+        self.label = QLabel(self)
+        self.label.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        self.th = None
+        self.cam_index = None
+        self.record = True
+        self.time = None
+
+    def resizeEvent(self, event):
+        QGroupBox.resizeEvent(self, event)
+        r = self.geometry()
+        self.width = r.width()
+        self.height = r.height()
+        if self.th:
+            self.th.width = self.width
+            self.th.height = self.height
+        self.label.setGeometry(2, 1, self.width-2, self.height-2)
+
+    def start_video(self):
+        if not self.th and self.cam_index != None:
+            self.stime = time()
+            self.th = PlayerThread(self, self.width, self.height)
+            self.th.record = self.record
+            self.th.delay = not self.record
+            self.th.changePixmap.connect(self.setImage)
+            self.th.cam_index = self.cam_index
+            self.th.start()
+
+    def stop_video(self):
+        if self.th:
+            self.th.exit = True
+            if hasattr(self.th, "fcount"):
+                cmd = "ffmpeg -y -r {} -i \"{}\" \"{}\"".format(int(self.th.fcount/(
+                    time()-self.stime)), PATH_VIDEOS_RLATEST, PATH_VIDEOS_LATEST)
+                print(cmd)
+                os.system(cmd)
+                copyfile(PATH_VIDEOS_LATEST, os.path.join(
+                    PATH_VIDEOS, datetime.now().strftime("%m.%d.%Y_%H:%M:%S.avi")))
+            self.th = None
+
+    def select_index(self, port):
+        if port == "latest":
+            self.cam_index = PATH_VIDEOS_LATEST
+            self.record = False
+        else:
+            index = 0
+            arr = []
+            i = 100
+            while i > 0:
+                cap = cv2.VideoCapture(index)
+                if cap.read()[0]:
+                    if index != 0:
+                        arr.append(index)
+                    cap.release()
+                index += 1
+                i -= 1
+            print(arr)
+            arr = arr
+            if len(arr) == 0:
+                self.cam_index = None
+                QMessageBox.critical(self, "Yer İstasyonu Yazılımı",
+                                     "Hiçbir video girişi bulunamadı.")
+                return
+            while not self.cam_index in arr:
+                if len(arr) > 1:
+                    self.cam_index = int(QInputDialog.getItem(
+                        self, "Yer istasyonu yazılımı", "Video giriş indexi: ", list(map(str, arr)), 0, False)[0])
+                elif len(arr) == 0:
+                    return
+                else:
+                    self.cam_index = 0
+
+    @ Slot(QImage)
+    def setImage(self, image):
+        self.label.setPixmap(QPixmap.fromImage(image))
+
+
+class PlayerThread(QThread):
+    changePixmap = Signal(QImage)
+
+    def __init__(self, parent, width, height):
+        QThread.__init__(self, parent)
+        self.width = width
+        self.height = height
+        self.cam_index = -1
+        self.exit = False
+        self.record = True
+        self.out = None
+
+    def start_record(self, width, height):
+        if self.record:
+            self.fcount = 0
+            self.out = cv2.VideoWriter(
+                PATH_VIDEOS_RLATEST, cv2.VideoWriter_fourcc(*'XVID'), 25, (width, height))
+
+    def stop_record(self):
+        if self.out:
+            self.out.release()
+            self.out = None
+
+    def write_record(self, data):
+        if self.out:
+            self.fcount += 1
+            self.out.write(data)
+
+    def run(self):
+        cap = cv2.VideoCapture(self.cam_index)
+        ret = False
+        if self.delay:
+            delay = 1/cap.get(cv2.CAP_PROP_FPS)
+        else:
+            delay = 0
+        while not ret:
+            ret, frame = cap.read()
+            width = frame.shape[1]
+            height = frame.shape[0]
+            sleep(0.01)
+        self.start_record(width, height)
+        while cap.isOpened() and not self.exit:
+            ret, frame = cap.read()
+            if ret:
+                self.write_record(frame)
+                rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                h, w, ch = rgbImage.shape
+                bytesPerLine = ch * w
+                r = qimage2ndarray.array2qimage(rgbImage)
+                p = r.scaled(self.width-4, self.height-4,
+                             Qt.KeepAspectRatio, Qt.FastTransformation)
+                self.changePixmap.emit(p)
+                del frame
+            sleep(delay)
+        self.stop_record()
+
+
+class GpsMap(QGroupBox):
+    def __init__(self):
+        QGroupBox.__init__(self)
+        r = self.geometry()
+        self.width = r.width()
+        self.height = r.height()
+        self.web = QWebEngineView(self)
+        self.web.setHtml(open("assets/map.html", "r").read())
+        self.th = None
+        self.cam_index = None
+        self.record = True
+        self.time = None
+
+    def resizeEvent(self, event):
+        QGroupBox.resizeEvent(self, event)
+        r = self.geometry()
+        self.width = r.width()
+        self.height = r.height()
+        if self.th:
+            self.th.width = self.width
+            self.th.height = self.height
+        self.web.setGeometry(2, 2, self.width-4, self.height-4)
+
+    def setLocation(self, a, b):
+        self.web.page().runJavaScript(f'window.setLocation({a},{b})')
+
+
+class TelemetryThread(QThread):
+    changeTelemetry = Signal()
+
+    def __init__(self, parent):
+        QThread.__init__(self, parent)
+        self.rfile = None
+        self.exit = False
+
+    def start_at_port(self, port):
+        self.data = [list() for _ in range(17)]
+        self.streaming = False
+        self.cmd = None
+        self.perc = 0
+        if port == "debug":
+            self.mode = 0
+            self.sleep = True
+            self.start()
+            return True
+        elif port == "latest":
+            self.mode = 1
+            self.sleep = True
+            self.stream = open(PATH_TELEMETRY_LATEST, "r")
+            self.start()
+            return True
+        else:
+            # try:
+            self.stream = TelemetrySerial(port)
+            self.mode = 2
+            self.sleep = False
+            self.start()
+            return True
+            # except:
+            #    pass
+            try:
+                self.stream = open(port, "r")
+                self.mode = 1
+                self.sleep = True
+                self.start()
+                return True
+            except:
+                pass
+            return False
+
+    def stop(self):
+        self.exit = True
+        f = self.rfile
+        self.rfile = None
+        self.close_record()
+        copyfile(PATH_TELEMETRY_LATEST, os.path.join(PATH_TELEMETRY,
+                                                     datetime.now().strftime("%m.%d.%Y_%H:%M:%S.csv")))
+
+    def open_record(self):
+        if self.mode != 1:
+            self.rfile = open(PATH_TELEMETRY_LATEST, "w")
+
+    def write_record(self, data):
+        if self.mode != 1 and self.rfile:
+            self.rfile.write(",".join([str(data[i][-1]) for i in range(17)]))
+            self.rfile.write("\n")
+            self.rfile.flush()
+
+    def close_record(self):
+        if self.rfile:
+            self.rfile.close()
+
+    def start_stream(self, path):
+        if self.mode == 2:
+            self.stream.load_file(path)
+            self.streaming = True
+
+    def stop_stream(self, path):
+        if self.mode == 2:
+            self.stream.load_file(path)
+            self.streaming = True
+
+    def run(self):
+        self.open_record()
+        if self.mode == 0:
+            count = 0
+            x, y, z = 0, 0, 0
+            r = self.data
+            dt = 1
+            time = 0
+            while not self.exit:
+                r[0].append(50626)
+                r[1].append(count)
+                r[2].append(time)
+                count += 1
+                time += dt
+                r[11].append(1)
+                r[15].append(3)
+                r[16].append(0)
+                r[12].append(x)  # pitch
+                r[13].append(y)  # roll
+                r[14].append(z)  # yaw
+                x += 8
+                y += 8
+                z += 8
+                x %= 360
+                y %= 360
+                z %= 360
+                for i in range(3, 11):
+                    r[i].append((((count+i)) % 3-1)*i)
+                r[8].append(26.628669+count/2500)
+                r[9].append(40.843132+count/2500)
+                self.write_record(r)
+                self.changeTelemetry.emit()
+                if self.sleep:
+                    sleep(dt)
+        elif self.mode == 2:
+            count = 0
+            r = self.data
+            ser = self.stream
+            while not self.exit:
+                data = ser.readline()
+                if data:
+                    data = data[:-2].decode().split(",")
+                    print(data)
+                    if len(data) == 17:
+                        for i in range(17):
+                            r[i].append(num(data[i]))
+                        self.write_record(r)
+                        self.changeTelemetry.emit()
+                if self.cmd:
+                    ser.cmd = self.cmd
+                    self.cmd = None
+                if self.streaming:
+                    for _ in range(3):
+                        ser.stream()
+                    self.perc = ser.perc
+                ser.manual_trigger()
+            ser.close()
+        else:
+            count = 0
+            r = self.data
+            ser = self.stream
+            while not self.exit:
+                data = ser.readline().split(",")
+                if data[0] == "":
+                    break
+                for i in range(17):
+                    r[i].append(num(data[i]))
+                self.write_record(r)
+                self.changeTelemetry.emit()
+                if self.sleep:
+                    sleep(1)
+        self.close_record()
+
+
+class TelemetrySerial():
+    def __init__(self, port):
+        self.port = port
+        self.ser = Serial(port, 115200, timeout=1)
+        self.cmd = None
+        self.buf = bytearray()
+        self.i = 0
+        self.perc = 0
+        self.skip = False
+        sleep(5)
+
+    def load_file(self, path):
+        print("Loading file")
+        with open(path, "rb") as f:
+            data = f.read()
+        hsh = 0
+        for c in memoryview(data):
+            hsh ^= c
+        print("File is loaded. hash = {} len = {}".format(hsh, len(data)))
+        self.data = memoryview(data.replace(b"a", b"aa")+b"ac")
+
+    def close(self):
+        self.ser.close()
+        self.ser = None
+
+    def set_command(self, cmd):
+        self.cmd = cmd
+
+    def stream(self, num=1024):
+        ser = self.ser
+        chunk = self.data[self.i:self.i+min(num, len(self.data))]
+        r = False
+        if len(chunk) > 0:
+            self.i += ser.write(chunk)
+            self.perc = (self.i/len(self.data))*100
+            r = True
+            self.skip = chunk[-1] == 97
+        else:
+            self.skip = False
+        if self.cmd != None and not self.skip:
+            ser.write(b"a\n")
+            ser.flush()
+            self.cmd = None
+        return r
+
+    def manual_trigger(self):
+        ser = self.ser
+        if self.cmd != None and not self.skip:
+            ser.write(b"a\n")
+            ser.flush()
+            self.cmd = None
+
+    def readline(self):
+        i = self.buf.find(b"\n")
+        if i >= 0:
+            r = self.buf[:i+1]
+            self.buf = self.buf[i+1:]
+            return r
+        while True:
+            i = max(1, min(2048, self.ser.in_waiting))
+            data = self.ser.read(i)
+            i = data.find(b"\n")
+            if i >= 0:
+                r = self.buf + data[:i+1]
+                self.buf[0:] = data[i+1:]
+                return r
+            else:
+                self.buf.extend(data)
+                return None
+
+    def readlines(self):
+        r = []
+        while line := self.readline():
+            r.append(line)
+        return r
+
+
+def num(s):
+    try:
+        return int(s)
+    except ValueError:
+        pass
+    try:
+        return float(s)
+    except ValueError:
+        return 0
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    main_window = MainWindow()
+    main_window.show()
+    r = app.exec_()
+    main_window.cleanup()
+    sys.exit(r)
