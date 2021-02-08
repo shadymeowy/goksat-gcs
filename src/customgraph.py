@@ -8,6 +8,7 @@ try:
 except ImportError:
     from config import *
 
+
 class CustomGraph(QGroupBox):
     def __init__(self, title, *args, **kargs):
         QGroupBox.__init__(self)
@@ -86,4 +87,33 @@ class CustomGraph(QGroupBox):
         l.setWidth(18)
         if self.plotdata:
             self.plotdata = None
-            self.plot() 
+            self.plot()
+
+
+if __name__ == "__main__":
+    import sys
+    import numpy as np
+
+    class MainWindow(QMainWindow):
+        def __init__(self, parent=None):
+            super(MainWindow, self).__init__(parent)
+            self.timer = QTimer(self)
+            self.customgraph = CustomGraph("Sine")
+            self.customgraph.setParent(self)
+            self.setGeometry(0, 0, 512, 512+256)
+            self.customgraph.setGeometry(0, 0, 512, 512+256)
+            self.timer.timeout.connect(self.update_widget)
+            self.timer.start(1000/60)
+            self.time = 0
+
+        def update_widget(self):
+            self.time += 1/60
+            self.customgraph.x = np.linspace(0, self.time, int(self.time*10)+10)
+            self.customgraph.y = np.sin(self.customgraph.x)
+            self.customgraph.plot()
+
+    app = QApplication(sys.argv)
+    main_window = MainWindow()
+    main_window.show()
+    r = app.exec_()
+    sys.exit(r)

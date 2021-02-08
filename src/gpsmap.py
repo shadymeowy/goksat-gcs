@@ -57,18 +57,18 @@ if __name__ == "__main__":
         def __init__(self, parent=None):
             super(MainWindow, self).__init__(parent)
             self.timer = QTimer(self)
-            self.navball = GpsMap()
-            self.navball.setParent(self)
+            self.gpsmap = GpsMap()
+            self.gpsmap.setParent(self)
             self.setGeometry(0, 0, 256, 256)
-            self.navball.setGeometry(0, 0, 256, 256)
-            self.navball.web.loadFinished.connect(
+            self.gpsmap.setGeometry(0, 0, 256, 256)
+            self.gpsmap.web.loadFinished.connect(
                 lambda: self.timer.timeout.connect(self.update_widget))
             self.timer.start(32)
             self.data = np.array([32.77763183069467, 39.89293236532307])
 
         def update_widget(self):
             self.data += .0001
-            self.navball.setLocation(*self.data)
+            self.gpsmap.setLocation(*self.data)
 
     app = QApplication(sys.argv)
     main_window = MainWindow()
