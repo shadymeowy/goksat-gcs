@@ -2,9 +2,9 @@ import sys
 from PySide2.QtWidgets import *
     
 try:
-    from .mainwindow import MainWindow
+    from .MainWindow import MainWindow
 except ImportError:
-    from mainwindow import MainWindow
+    from MainWindow import MainWindow
 
 
 def main():

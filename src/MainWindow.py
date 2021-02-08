@@ -4,23 +4,23 @@ from PySide2.QtGui import *
 from PySide2.QtCore import *
 from datetime import datetime
 try:
-    from .nav2d import Nav2D
-    from .navball import Navball
-    from .player import Player
+    from .Nav2D import Nav2D
+    from .Navball import Navball
+    from .Player import Player
     from .config import *
     from .blend_image import blend_image
-    from .gpsmap import GpsMap
-    from .customgraph import CustomGraph
-    from .telemetry import TelemetryThread, available_ports
+    from .GpsMap import GpsMap
+    from .CustomGraph import CustomGraph
+    from .TelemetryThread import TelemetryThread, available_ports
 except ImportError:
-    from nav2d import Nav2D
-    from navball import Navball
-    from player import Player
+    from Nav2D import Nav2D
+    from Navball import Navball
+    from Player import Player
     from config import *
     from blend_image import blend_image
-    from gpsmap import GpsMap
-    from customgraph import CustomGraph
-    from telemetry import TelemetryThread, available_ports
+    from GpsMap import GpsMap
+    from CustomGraph import CustomGraph
+    from TelemetryThread import TelemetryThread, available_ports
 
 
 class MainWindow(QMainWindow):
