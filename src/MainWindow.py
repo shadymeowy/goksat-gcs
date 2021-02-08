@@ -111,10 +111,10 @@ class MainWindow(QMainWindow):
             self.video_text.setText(r[0])
 
     def toggle_connection(self):
-        if not self.tth or self.tth.isFinished():
+        if not self.tth or self.tth.exit:
             self.pcount = 0
             self.tth = TelemetryThread(self)
-            self.tth.changeTelemetry.connect(self.update_ui)
+            self.tth.changeTelemetry = self.update_ui
             self.player.select_index(self.port_text.currentText())
             if not self.tth.start_at_port(self.port_text.currentText()):
                 QMessageBox.critical(
@@ -141,7 +141,7 @@ class MainWindow(QMainWindow):
         r = self.tth.data
         for p in telemetry.values():
             g = self.graphs[p[2]]
-            g.x = r[1]
+            g.x = r[2]
             g.y = r[p[2]]
             g.plot()
         self.pcount_text.setText(str(self.pcount))

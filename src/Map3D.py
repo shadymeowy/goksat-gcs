@@ -48,7 +48,7 @@ class Map3D(QGroupBox):
             QPalette.Active, QPalette.Highlight))
         self.bsbr = mkBrush(color=palette.color(QPalette.Base))
 
-    def drawPolygon(self, x, y, pen = Qt.NoPen, brush = Qt.NoBrush):
+    def drawPolygon(self, x, y, pen=Qt.NoPen, brush=Qt.NoBrush):
         poly = QPolygonF()
         for i in range(len(x)):
             poly.append(QPointF(x[i], y[i]))
@@ -60,7 +60,7 @@ class Map3D(QGroupBox):
         super().paintEvent(e)
         self.painter = QPainter(self)
         self.painter.setRenderHint(QPainter.Antialiasing, bool=True)
-        self.drawPolygon([0,10,10,0], [0,0,10,10], self.fg15)
+        self.drawPolygon([0, 10, 10, 0], [0, 0, 10, 10], self.fg15)
         self.painter.end()
 
 

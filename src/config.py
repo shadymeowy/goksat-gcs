@@ -31,4 +31,4 @@ PATH_VIDEOS = "videos"
 PATH_ASSETS = "assets"
 PATH_TELEMETRY_LATEST = os.path.join(PATH_TELEMETRY, "latest.csv")
 PATH_VIDEOS_RLATEST = os.path.join(PATH_VIDEOS, "rlatest.avi")
-PATH_VIDEOS_LATEST = os.path.join(PATH_VIDEOS, "latest.avi") 
+PATH_VIDEOS_LATEST = os.path.join(PATH_VIDEOS, "latest.avi")

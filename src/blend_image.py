@@ -6,6 +6,7 @@ try:
 except ImportError:
     from config import *
 
+
 def blend_image(mask_name, color, reverse=False, p=1):
     mask_path = os.path.join(PATH_ASSETS, mask_name)
     image_path = mask_path + ".blended.png"

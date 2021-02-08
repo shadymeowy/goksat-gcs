@@ -1,3 +1,4 @@
+import io
 import PySide2
 import serial.tools.list_ports as lsp
 from PySide2.QtWidgets import *
@@ -15,51 +16,49 @@ except ImportError:
     from config import *
 
 
-class TelemetryThread(QThread):
-    changeTelemetry = Signal()
+class TelemetryThread(QObject):
 
     def __init__(self, parent):
-        QThread.__init__(self, parent)
+        super().__init__()
+        self.parent = parent
         self.rfile = None
         self.exit = False
+        self.timer = QTimer(parent)
+        self.dt = 1/60
 
     def start_at_port(self, port):
         self.data = [list() for _ in range(17)]
+        self.port = port
         self.streaming = False
         self.cmd = None
         self.perc = 0
-        if port == "debug":
-            self.mode = 0
-            self.sleep = True
-            self.start()
+        self.stream = None
+        if self.port == "debug":
+            self.start_loop()
             return True
-        elif port == "latest":
-            self.mode = 1
-            self.sleep = True
+        elif self.port == "latest":
             self.stream = open(PATH_TELEMETRY_LATEST, "r")
-            self.start()
+            self.start_loop()
             return True
         else:
             # try:
             self.stream = TelemetrySerial(port)
-            self.mode = 2
-            self.sleep = False
-            self.start()
+            self.start_loop()
             return True
             # except:
             #    pass
             try:
                 self.stream = open(port, "r")
-                self.mode = 1
-                self.sleep = True
-                self.start()
+                self.start_loop()
                 return True
             except:
                 pass
             return False
 
     def stop(self):
-        self.exit = True
+        if self.stream:
+            self.stream.close()
+        self.timer.stop()
         f = self.rfile
         self.rfile = None
         self.close_record()
@@ -68,11 +67,11 @@ class TelemetryThread(QThread):
         copyfile(PATH_TELEMETRY_LATEST, filename)
 
     def open_record(self):
-        if self.mode != 1:
+        if self.port == "debug" or isinstance(self.stream, TelemetrySerial):
             self.rfile = open(PATH_TELEMETRY_LATEST, "w")
 
     def write_record(self, data):
-        if self.mode != 1 and self.rfile:
+        if self.rfile:
             self.rfile.write(",".join([str(data[i][-1]) for i in range(17)]))
             self.rfile.write("\n")
             self.rfile.flush()
@@ -82,87 +81,84 @@ class TelemetryThread(QThread):
             self.rfile.close()
 
     def start_stream(self, path):
-        if self.mode == 2:
+        if isinstance(self.stream, TelemetrySerial):
             self.stream.load_file(path)
             self.streaming = True
 
     def stop_stream(self, path):
-        if self.mode == 2:
+        if isinstance(self.stream, TelemetrySerial):
             self.stream.load_file(path)
             self.streaming = True
 
-    def run(self):
+    def start_loop(self):
         self.open_record()
-        if self.mode == 0:
-            count = 0
-            x, y, z = 0, 0, 0
+        self.timer.timeout.connect(self.loop)
+        self.timer.start(int(self.dt*1000))
+        if self.port == "debug":
+            self.count = 0
+            self.x, self.y, self.z = 0, 0, 0
+            self.time = 0
+
+    def loop(self):
+        if self.port == "debug":
             r = self.data
-            dt = 1
-            time = 0
-            while not self.exit:
-                r[0].append(50626)
-                r[1].append(count)
-                r[2].append(time)
-                count += 1
-                time += dt
-                r[11].append(1)
-                r[15].append(3)
-                r[16].append(0)
-                r[12].append(x)  # pitch
-                r[13].append(y)  # roll
-                r[14].append(z)  # yaw
-                x += 8
-                y += 8
-                z += 8
-                x %= 360
-                y %= 360
-                z %= 360
-                for i in range(3, 11):
-                    r[i].append((((count+i)) % 3-1)*i)
-                r[8].append(32.77763183069467+count/2500)
-                r[9].append(39.89293236532307+count/2500)
-                self.write_record(r)
-                self.changeTelemetry.emit()
-                if self.sleep:
-                    sleep(dt)
-        elif self.mode == 2:
-            count = 0
+            dt = self.dt
+            r[0].append(50626)
+            r[1].append(self.count)
+            r[2].append(self.time)
+            self.count += 1
+            self.time += dt
+            time = self.time
+            r[11].append(1)
+            r[15].append(3)
+            r[16].append(0)
+            r[12].append(self.x)  # pitch
+            r[13].append(self.x)  # roll
+            r[14].append(self.x)  # yaw
+            self.x += 60*dt
+            self.y += 60*dt
+            self.z += 60*dt
+            self.x %= 360
+            self.y %= 360
+            self.z %= 360
+            for i in range(3, 11):
+                r[i].append((((time+i)) % 3-1)*i)
+            r[8].append(32.77763183069467+time/2500)
+            r[9].append(39.89293236532307+time/2500)
+            self.write_record(r)
+            self.changeTelemetry()
+        elif isinstance(self.stream, TelemetrySerial):
+            ser = self.ser
             r = self.data
-            ser = self.stream
-            while not self.exit:
-                data = ser.readline()
-                if data:
-                    data = data[:-2].decode().split(",")
-                    print(data)
-                    if len(data) == 17:
-                        for i in range(17):
-                            r[i].append(num(data[i]))
-                        self.write_record(r)
-                        self.changeTelemetry.emit()
-                if self.cmd:
-                    ser.cmd = self.cmd
-                    self.cmd = None
-                if self.streaming:
-                    for _ in range(3):
-                        ser.stream()
-                    self.perc = ser.perc
-                ser.manual_trigger()
-            ser.close()
+            data = ser.readline()
+            if data:
+                data = data[:-2].decode().split(",")
+                print(data)
+                if len(data) == 17:
+                    for i in range(17):
+                        r[i].append(num(data[i]))
+                    self.write_record(r)
+                    self.changeTelemetry()
+            if self.cmd:
+                ser.cmd = self.cmd
+                self.cmd = None
+            if self.streaming:
+                for _ in range(3):
+                    ser.stream()
+                self.perc = ser.perc
+            ser.manual_trigger()
         else:
-            count = 0
-            r = self.data
             ser = self.stream
-            while not self.exit:
-                data = ser.readline().split(",")
-                if data[0] == "":
-                    break
-                for i in range(17):
-                    r[i].append(num(data[i]))
-                self.write_record(r)
-                self.changeTelemetry.emit()
-                if self.sleep:
-                    sleep(1)
-        self.close_record()
+            r = self.data
+            data = ser.readline().split(",")
+            if data[0] == "":
+                ser.close()
+                self.timer.stop()
+                return
+            for i in range(17):
+                r[i].append(num(data[i]))
+            self.write_record(r)
+            self.changeTelemetry()
 
 
 class TelemetrySerial():
