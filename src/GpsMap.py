@@ -19,7 +19,6 @@ class GpsMap(QGroupBox):
         self.height = r.height()
         self.web = QWebEngineView(self)
         self.web.setHtml(open("assets/map.html", "r").read())
-        print(open("assets/map.html", "r").read())
         self.web.setGeometry(2, 2, self.width-4, self.height-4)
         self.web.loadFinished.connect(self.mask_image)
         self.web.setAttribute(Qt.WA_DontShowOnScreen)
@@ -29,6 +28,7 @@ class GpsMap(QGroupBox):
         QApplication.instance().paletteChanged.connect(self.mask_image)
 
     def mask_image(self, e=None):
+        return
         size = self.web.contentsRect()
         img = QPixmap(size.width(), size.height())
         self.web.render(img)
