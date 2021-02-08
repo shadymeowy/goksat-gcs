@@ -40,9 +40,9 @@ class Nav2D(QGroupBox):
                        [0.6, 0.9, 0], [-0.6, 0.9, 0], [-0.67, -0.6, 0], [0.67, -0.6, 0], [0, -0.7, 0], [0, -0.5, 0]])
         a0 = np.sin(z)*ps[:, 1]+np.cos(z)*ps[:, 0]
         a1 = cos(z)*ps[:, 1]-sin(z)*ps[:, 0]
-        ps[:,0] = np.cos(y)*a0
-        ps[:,1] = np.sin(x)*np.sin(y)*a0+np.cos(x)*a1
-        ps[:,2] = np.cos(x)*np.sin(y)*a0-np.sin(x)*a1
+        ps[:, 0] = np.cos(y)*a0
+        ps[:, 1] = np.sin(x)*np.sin(y)*a0+np.cos(x)*a1
+        ps[:, 2] = np.cos(x)*np.sin(y)*a0-np.sin(x)*a1
         sq2 = sqrt(2)
         ln = [(0, 1), (1, 2), (2, 3), (3, 0)]
         width = self.geometry().width()
@@ -58,9 +58,9 @@ class Nav2D(QGroupBox):
         m = 10
         a = (w - 2*m) / (2*sq2)
         A = 0.4
-        ps[:,2] = A*(ps[:,2]+1+sq2)-A+1
-        ps[:,0] = ((ps[:,0]/ps[:,2]+sq2)*a+m) + wd
-        ps[:,1] = ((ps[:,1]/ps[:,2]+sq2)*a+m) + hd
+        ps[:, 2] = A*(ps[:, 2]+1+sq2)-A+1
+        ps[:, 0] = ((ps[:, 0]/ps[:, 2]+sq2)*a+m) + wd
+        ps[:, 1] = ((ps[:, 1]/ps[:, 2]+sq2)*a+m) + hd
         pn = QPainter(self)
         pn.setRenderHint(QPainter.Antialiasing, bool=True)
         poly = QPolygonF()
@@ -87,3 +87,29 @@ class Nav2D(QGroupBox):
         pn.setPen(self.fg05)
         pn.setBrush(Qt.NoBrush)
         pn.drawPolygon(poly)
+
+
+if __name__ == "__main__":
+    import sys
+
+    class MainWindow(QMainWindow):
+        def __init__(self, parent=None):
+            super(MainWindow, self).__init__(parent)
+            self.timer = QTimer(self)
+            self.nav2d = Nav2D()
+            self.nav2d.setParent(self)
+            self.setGeometry(0, 0, 256, 256)
+            self.nav2d.setGeometry(0, 0, 256, 256)
+            self.timer.timeout.connect(self.update_widget)
+            self.timer.start(1000/60)
+            self.data = np.zeros(3)
+
+        def update_widget(self):
+            self.data += 1
+            self.nav2d.setAngle(*self.data)
+
+    app = QApplication(sys.argv)
+    main_window = MainWindow()
+    main_window.show()
+    r = app.exec_()
+    sys.exit(r)

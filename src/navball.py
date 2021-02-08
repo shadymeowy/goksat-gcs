@@ -121,3 +121,29 @@ class NavballGL(QOpenGLWidget):
                   0, 0, 0,
                   0, 1, 0)
         glPushMatrix()
+
+
+if __name__ == "__main__":
+    import sys
+
+    class MainWindow(QMainWindow):
+        def __init__(self, parent=None):
+            super(MainWindow, self).__init__(parent)
+            self.timer = QTimer(self)
+            self.navball = Navball()
+            self.navball.setParent(self)
+            self.setGeometry(0, 0, 256, 256)
+            self.navball.setGeometry(0, 0, 256, 256)
+            self.timer.timeout.connect(self.update_widget)
+            self.timer.start(1000/60)
+            self.data = np.zeros(3)
+
+        def update_widget(self):
+            self.data += 1
+            self.navball.setAngle(*self.data)
+
+    app = QApplication(sys.argv)
+    main_window = MainWindow()
+    main_window.show()
+    r = app.exec_()
+    sys.exit(r)
