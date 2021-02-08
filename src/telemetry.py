@@ -119,8 +119,8 @@ class TelemetryThread(QThread):
                 z %= 360
                 for i in range(3, 11):
                     r[i].append((((count+i)) % 3-1)*i)
-                r[8].append(26.628669+count/2500)
-                r[9].append(40.843132+count/2500)
+                r[8].append(32.77763183069467+count/2500)
+                r[9].append(39.89293236532307+count/2500)
                 self.write_record(r)
                 self.changeTelemetry.emit()
                 if self.sleep:
