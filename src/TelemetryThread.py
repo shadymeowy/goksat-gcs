@@ -88,7 +88,7 @@ class TelemetryThread(QObject):
     def stop_stream(self, path):
         if isinstance(self.stream, TelemetrySerial):
             self.stream.load_file(path)
-            self.streaming = True
+            self.streaming = True #TODO
 
     def start_loop(self):
         self.open_record()
