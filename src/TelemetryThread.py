@@ -63,7 +63,7 @@ class TelemetryThread(QObject):
         self.rfile = None
         self.close_record()
         filename = os.path.join(
-            PATH_TELEMETRY, datetime.now().strftime("%m.%d.%Y_%H:%M:%S.csv"))
+            PATH_TELEMETRY, datetime.now().strftime("%m.%d.%Y_%H.%M.%S.csv"))
         copyfile(PATH_TELEMETRY_LATEST, filename)
 
     def open_record(self):

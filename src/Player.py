@@ -55,7 +55,7 @@ class Player(QGroupBox):
                 print(cmd)
                 os.system(cmd)
                 copyfile(PATH_VIDEOS_LATEST, os.path.join(
-                    PATH_VIDEOS, datetime.now().strftime("%m.%d.%Y_%H:%M:%S.avi")))
+                    PATH_VIDEOS, datetime.now().strftime("%m.%d.%Y_%H.%M.%S.avi")))
             self.th = None
 
     def select_index(self, port):
