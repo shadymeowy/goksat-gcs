@@ -16,7 +16,7 @@ except ImportError:
 
 class Navball(QGroupBox):
     def __init__(self):
-        QGroupBox.__init__(self)
+        super().__init__()
         self.glw = NavballGL(self)
         r = self.geometry()
         self.glw.setGeometry(2, 2, r.width()-4, r.height()-4)
@@ -30,9 +30,9 @@ class Navball(QGroupBox):
         palette = palette or self.palette()
         color = palette.color(QPalette.Highlight)
         self.cursor.setPixmap(QPixmap(blend_image("cursor_mask.png", color)))
-
+ 
     def resizeEvent(self, e):
-        QGroupBox.resizeEvent(self, e)
+        super().resizeEvent(e)
         r = self.geometry()
         self.glw.setGeometry(2, 2, r.width()-4, r.height()-4)
         self.cursor.setGeometry(2, 2, r.width()-4, r.height()-4)
@@ -46,7 +46,7 @@ class Navball(QGroupBox):
 
 class NavballGL(QOpenGLWidget):
     def __init__(self, parent):
-        QOpenGLWidget.__init__(self, parent)
+        super().__init__(parent)
         r = self.geometry()
         self.width = r.width()
         self.height = r.height()

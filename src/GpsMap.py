@@ -10,13 +10,13 @@ except ImportError:
 
 class GpsMap(QGroupBox):
     def __init__(self):
-        QGroupBox.__init__(self)
+        super().__init__()
         r = self.geometry()
         self.width = r.width()
         self.height = r.height()
 
     def resizeEvent(self, event):
-        QGroupBox.resizeEvent(self, event)
+        super().resizeEvent(event)
         r = self.geometry()
         self.width = r.width()
         self.height = r.height()

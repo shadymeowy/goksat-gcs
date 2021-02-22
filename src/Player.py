@@ -15,7 +15,7 @@ except ImportError:
 
 class Player(QGroupBox):
     def __init__(self):
-        QGroupBox.__init__(self)
+        super().__init__()
         r = self.geometry()
         self.width = r.width()
         self.height = r.height()
@@ -27,7 +27,7 @@ class Player(QGroupBox):
         self.time = None
 
     def resizeEvent(self, event):
-        QGroupBox.resizeEvent(self, event)
+        super().resizeEvent(event)
         r = self.geometry()
         self.width = r.width()
         self.height = r.height()
@@ -98,7 +98,7 @@ class PlayerThread(QThread):
     changePixmap = Signal(QImage)
 
     def __init__(self, parent, width, height):
-        QThread.__init__(self, parent)
+        super().__init__(parent)
         self.width = width
         self.height = height
         self.cam_index = -1

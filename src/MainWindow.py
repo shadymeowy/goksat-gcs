@@ -25,7 +25,7 @@ except ImportError:
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
-        super(MainWindow, self).__init__(parent)
+        super().__init__(parent)
         self.setWindowTitle("Göksat 1 Yer İstasyonu Yazılımı")
         self.setWindowIcon(QIcon('assets/icon.ico'))
         self.setGeometry(0, 0, 1366, 768-24)

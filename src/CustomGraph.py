@@ -11,7 +11,7 @@ except ImportError:
 
 class CustomGraph(QGroupBox):
     def __init__(self, title, *args, **kargs):
-        QGroupBox.__init__(self)
+        super().__init__()
         setConfigOptions(antialias=True)
         self.title = title
         self.graph = PlotWidget(self, title=title, *args, **kargs)
@@ -25,7 +25,7 @@ class CustomGraph(QGroupBox):
         QApplication.instance().paletteChanged.connect(self.update_style)
 
     def resizeEvent(self, e):
-        QGroupBox.resizeEvent(self, e)
+        super().resizeEvent(e)
         r = self.geometry()
         self.graph.setGeometry(2, 2, r.width()-4-17, r.height()-4)
 
@@ -108,7 +108,8 @@ if __name__ == "__main__":
 
         def update_widget(self):
             self.time += 1/60
-            self.customgraph.x = np.linspace(0, self.time, int(self.time*10)+10)
+            self.customgraph.x = np.linspace(
+                0, self.time, int(self.time*10)+10)
             self.customgraph.y = np.sin(self.customgraph.x)
             self.customgraph.plot()
 

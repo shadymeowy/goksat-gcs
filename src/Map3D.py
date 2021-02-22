@@ -11,7 +11,7 @@ from math import cos, sin, sqrt
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
-        super(MainWindow, self).__init__(parent)
+        super().__init__(parent)
         self.map3d = Map3D()
         self.addWidget(self.map3d, 0, 0, 720, 720)
         self.setGeometry(0, 0, 720, 720)
@@ -31,7 +31,7 @@ class MainWindow(QMainWindow):
 
 class Map3D(QGroupBox):
     def __init__(self):
-        QGroupBox.__init__(self)
+        super().__init__()
         r = self.geometry()
         self.width = r.width()
         self.height = r.height()

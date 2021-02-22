@@ -9,7 +9,7 @@ from math import cos, sin, sqrt
 
 class Nav2D(QGroupBox):
     def __init__(self):
-        QGroupBox.__init__(self)
+        super().__init__()
         r = self.geometry()
         self.angle = [0, 0, 0]
         self.update_style()
@@ -32,7 +32,7 @@ class Nav2D(QGroupBox):
         self.update()
 
     def paintEvent(self, e):
-        QGroupBox.paintEvent(self, e)
+        super().paintEvent(e)
         x = self.angle[0]*0.0174532925
         y = self.angle[1]*0.0174532925
         z = self.angle[2]*0.0174532925
