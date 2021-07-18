@@ -30,10 +30,11 @@ class Navball(QGroupBox):
         palette = palette or self.palette()
         color = palette.color(QPalette.Highlight)
         self.cursor.setPixmap(QPixmap(blend_image("cursor_mask.png", color)))
- 
+
     def resizeEvent(self, e):
         super().resizeEvent(e)
         r = self.geometry()
+        print(r)
         self.glw.setGeometry(2, 2, r.width()-4, r.height()-4)
         self.cursor.setGeometry(2, 2, r.width()-4, r.height()-4)
 
@@ -48,8 +49,6 @@ class NavballGL(QOpenGLWidget):
     def __init__(self, parent):
         super().__init__(parent)
         r = self.geometry()
-        self.width = r.width()
-        self.height = r.height()
         self.angle = [0, 0, 0]
         self.update_gl = True
         self.tex = None
@@ -71,6 +70,15 @@ class NavballGL(QOpenGLWidget):
         glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 0.1)
         glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, 0.05)
         glEnable(GL_LIGHT0)
+        glViewport(0, 0, 256, 256)
+        glMatrixMode(GL_PROJECTION)
+        gluPerspective(40., 1., 1., 40.)
+        glMatrixMode(GL_MODELVIEW)
+        gluLookAt(0, 0, 10,
+                  0, 0, 0,
+                  0, 1, 0)
+        glEnable(GL_MULTISAMPLE)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
     def paintGL(self):
         if self.update_gl:
@@ -94,9 +102,7 @@ class NavballGL(QOpenGLWidget):
             fmt = GL_RGB if img.mode == "RGB" else GL_RGBA
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, img.size[0], img.size[1], 0,
                          fmt, GL_UNSIGNED_BYTE, img_data)
-        w, h = self.width, self.height
-        glEnable(GL_MULTISAMPLE)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        
         glPushMatrix()
         qobj = gluNewQuadric()
         gluQuadricTexture(qobj, GL_TRUE)
@@ -109,31 +115,32 @@ class NavballGL(QOpenGLWidget):
         gluDeleteQuadric(qobj)
         glDisable(GL_TEXTURE_2D)
         glPopMatrix()
+        
 
     def resizeGL(self, w, h):
-        self.width = w
-        self.height = h
-        glViewport(0, 0, w, h)
+        """glViewport(0, 0, 256, 256)
         glMatrixMode(GL_PROJECTION)
         gluPerspective(40., 1., 1., 40.)
         glMatrixMode(GL_MODELVIEW)
         gluLookAt(0, 0, 10,
                   0, 0, 0,
                   0, 1, 0)
-        glPushMatrix()
+        glEnable(GL_MULTISAMPLE)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)"""
 
 
 if __name__ == "__main__":
     import sys
 
-    class MainWindow(QMainWindow):
+    class MainWindow(QDialog):
         def __init__(self, parent=None):
             super(MainWindow, self).__init__(parent)
             self.timer = QTimer(self)
             self.navball = Navball()
-            self.navball.setParent(self)
             self.setGeometry(0, 0, 256, 256)
-            self.navball.setGeometry(0, 0, 256, 256)
+            layout = QGridLayout()
+            layout.addWidget(self.navball, 0, 0, 1, 1)
+            self.setLayout(layout)
             self.timer.timeout.connect(self.update_widget)
             self.timer.start(1000/60)
             self.data = np.zeros(3)
