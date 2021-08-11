@@ -12,7 +12,9 @@ from serial import Serial
 
 try:
     from .config import *
+    from .XBee import *
 except ImportError:
+    from XBee import *
     from config import *
 
 
@@ -24,7 +26,7 @@ class TelemetryThread(QObject):
         self.rfile = None
         self.exit = False
         self.timer = QTimer(parent)
-        self.dt = 1/60
+        self.dt = 1
 
     def start_at_port(self, port):
         self.data = [list() for _ in range(17)]
@@ -128,11 +130,11 @@ class TelemetryThread(QObject):
             self.write_record(r)
             self.changeTelemetry()
         elif isinstance(self.stream, TelemetrySerial):
-            ser = self.ser
+            ser = self.stream
             r = self.data
             data = ser.readline()
             if data:
-                data = data[:-2].decode().split(",")
+                data = data[:-1].decode().split(",")
                 print(data)
                 if len(data) == 17:
                     for i in range(17):
@@ -170,7 +172,6 @@ class TelemetrySerial():
         self.i = 0
         self.perc = 0
         self.skip = False
-        sleep(5)
 
     def load_file(self, path):
         print("Loading file")
@@ -214,6 +215,15 @@ class TelemetrySerial():
             self.cmd = None
 
     def readline(self):
+        def fun():
+            while True:
+                c = self.ser.read(1)
+                if len(c) == 1:
+                    return c[0]
+        while True:
+            packet = read_packet(fun)
+            if packet[0] == FrameType.RECEIVE:
+                return packet[4]
         i = self.buf.find(b"\n")
         if i >= 0:
             r = self.buf[:i+1]
