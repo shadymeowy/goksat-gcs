@@ -141,7 +141,7 @@ class MainWindow(QMainWindow):
         r = self.tth.data
         for p in telemetry.values():
             g = self.graphs[p[2]]
-            g.x = r[2]
+            g.x = r[1]
             g.y = r[p[2]]
             g.plot()
         self.pcount_text.setText(str(self.pcount))
