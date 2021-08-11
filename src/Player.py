@@ -87,7 +87,7 @@ class Player(QGroupBox):
                 elif len(arr) == 0:
                     return
                 else:
-                    self.cam_index = 0
+                    self.cam_index = arr[-1]
 
     @ Slot(QImage)
     def setImage(self, image):
