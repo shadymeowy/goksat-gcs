@@ -4,16 +4,16 @@ small_font_family = "Sans-serif"
 small_font_size = 8
 
 telemetry = {
-    "Alt": (0, 2, 10),
-    "Basınç": (0, 3, 3),
-    "Yükseklik": (1, 3, 4),
-    "Sıcaklık": (2, 3, 6),
-    "İniş Hızı": (3, 3, 5),
+    "Alt (m)": (0, 2, 10),
+    "Basınç (Pa)": (0, 3, 3),
+    "Yükseklik (m)": (1, 3, 4),
+    "Sıcaklık (°C)": (2, 3, 6),
+    "İniş Hızı (m/s)": (3, 3, 5),
     "Statü": (4, 3, 15),
-    "Pil Gerilimi": (0, 1, 7),
-    "Pitch": (5, 3, 12),
-    "Roll": (5, 2, 13),
-    "Yaw": (5, 1, 14),
+    "Pil Gerilimi (V)": (0, 1, 7),
+    "Pitch (°)": (5, 3, 12),
+    "Roll (°)": (5, 2, 13),
+    "Yaw (°)": (5, 1, 14),
 }
 status = [
     "Başlangıç",
@@ -24,6 +24,25 @@ status = [
     "Kurtarma",
     "Veri Toplama",
     "PFR"
+]
+telemetry_names = [
+    "Takım",
+    "No",
+    "Zaman (s)",
+    "Basınç (Pa)",
+    "Yükseklik (m)",
+    "İniş Hızı (m/s)",
+    "Sıcaklık (°C)",
+    "Pil (V)",
+    "Lat",
+    "Long",
+    "Alt",
+    "Statü",
+    "Pitch (°)",
+    "Yaw (°)",
+    "Roll (°)",
+    "Dönüş",
+    "Aktarım"
 ]
 
 PATH_TELEMETRY = "telemetry"
