@@ -2,7 +2,10 @@ import PySide2
 from PySide2.QtWidgets import *
 from PySide2.QtGui import *
 from PySide2.QtCore import *
+from io import StringIO
 from datetime import datetime
+import sys
+
 try:
     from .Nav2D import Nav2D
     from .Navball import Navball
@@ -63,6 +66,17 @@ class MainWindow(QMainWindow):
         self.progresbar = self.addWidget(QProgressBar(), 922, 579, 1170, 610)
         self.progresbar.setValue(0)
         self.addButton("...", 1141, 547, 1170, 576, self.select_path)
+        self.table = QTableWidget()
+        self.table.setColumnCount(17)
+        self.table.setHorizontalHeaderLabels(telemetry_names)
+        self.log = QTextEdit()
+        self.addWidget(self.log, 1365, 55, 1920, 1080)
+        self.addWidget(QLabel("Log:"), 1368, 24, 1393, 54)
+        self.stdout_file = StringIO()
+        sys.stdout = self.stdout_file
+        for i in range(17):
+            self.table.horizontalHeader().setResizeMode(i, QHeaderView.Stretch)
+        self.addWidget(self.table, 0, 308 + 153*3, 6*190 + 225, 1080)
         self.tth = None
         self.setAcceptDrops(True)
 
@@ -137,13 +151,20 @@ class MainWindow(QMainWindow):
             self.player.stop_video()
 
     def update_ui(self):
-        self.pcount += 1
+        self.table.setRowCount(self.pcount+1)
         r = self.tth.data
         for p in telemetry.values():
             g = self.graphs[p[2]]
             g.x = r[1]
             g.y = r[p[2]]
             g.plot()
+        for i, v in enumerate(r):
+            item = QTableWidgetItem()
+            self.table.setItem(self.pcount, i, item)
+            item.setText(str(v[-1]))
+        self.log.setPlainText(self.stdout_file.getvalue())
+        self.table.scrollToBottom()
+        self.pcount += 1
         self.pcount_text.setText(str(self.pcount))
         self.navball.setAngle(r[12][-1], r[13][-1], r[14][-1])
         self.nav2d.setAngle(r[12][-1], r[13][-1], r[14][-1])
