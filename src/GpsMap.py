@@ -2,6 +2,7 @@ import os
 from PySide2.QtWidgets import *
 from PySide2.QtGui import *
 from PySide2.QtCore import *
+from PySide2.QtWebEngineWidgets import *
 try:
     from .config import *
 except ImportError:
@@ -12,17 +13,24 @@ class GpsMap(QGroupBox):
     def __init__(self):
         super().__init__()
         r = self.geometry()
+        self.view = QWebEngineView(self)
         self.width = r.width()
         self.height = r.height()
+        self.view.setParent(self)
+        self.view.setHtml(open(os.path.join(PATH_ASSETS, "map.html"),"r").read())
+        self.view.setGeometry(0, 0, self.width, self.height)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         r = self.geometry()
         self.width = r.width()
         self.height = r.height()
+        self.view.setGeometry(0, 0, self.width, self.height)
 
     def setLocation(self, a, b):
-        pass
+        self.view.page().runJavaScript(f"""
+            setLocation({b},{a});
+        """)
 
 
 if __name__ == "__main__":
