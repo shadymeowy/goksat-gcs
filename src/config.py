@@ -23,7 +23,8 @@ status = [
     "Yere İniş",
     "Kurtarma",
     "Veri Toplama",
-    "PFR"
+    "PFR",
+    "Test"
 ]
 telemetry_names = [
     "Takım",
