@@ -209,8 +209,10 @@ class TelemetrySerial():
 
     def manual_trigger(self):
         ser = self.ser
-        if self.cmd != None and not self.skip:
-            ser.write(b"a\n")
+        if self.cmd != None: #and not self.skip:
+            # ser.write(b"a\n")
+            ser.write(create_transmit_packet(b"abc", id=0, addr64=int(self.addr64, 16), addr16=int(self.addr16, 16)))
+            print("send")
             ser.flush()
             self.cmd = None
 
@@ -223,6 +225,8 @@ class TelemetrySerial():
         while True:
             packet = read_packet(fun)
             if packet[0] == FrameType.RECEIVE:
+                self.addr64 = packet[1]
+                self.addr16 = packet[2]
                 return packet[4]
         i = self.buf.find(b"\n")
         if i >= 0:
