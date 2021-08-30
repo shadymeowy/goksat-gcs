@@ -143,12 +143,13 @@ class TelemetryThread(QObject):
                     self.changeTelemetry()
             if self.cmd:
                 ser.cmd = self.cmd
+                ser.manual_trigger()
                 self.cmd = None
             if self.streaming:
                 for _ in range(3):
                     ser.stream()
                 self.perc = ser.perc
-            ser.manual_trigger()
+            
         else:
             ser = self.stream
             r = self.data
@@ -162,7 +163,6 @@ class TelemetryThread(QObject):
             self.write_record(r)
             self.changeTelemetry()
 
-
 class TelemetrySerial():
     def __init__(self, port):
         self.port = port
@@ -172,6 +172,7 @@ class TelemetrySerial():
         self.i = 0
         self.perc = 0
         self.skip = False
+        self.flag = False
 
     def load_file(self, path):
         print("Loading file")
@@ -209,9 +210,16 @@ class TelemetrySerial():
 
     def manual_trigger(self):
         ser = self.ser
+        if self.flag:
+            self.flag = False
+        else:
+            self.flag = True
         if self.cmd != None: #and not self.skip:
             # ser.write(b"a\n")
-            ser.write(create_transmit_packet(b"abc", id=0, addr64=int(self.addr64, 16), addr16=int(self.addr16, 16)))
+            if not self.flag:
+                ser.write(create_transmit_packet(b"abp" + bytes([16]), id=0, addr64=int(self.addr64, 16), addr16=int(self.addr16, 16)))
+            else:
+                ser.write(create_transmit_packet(b"abp" + bytes([0]), id=0, addr64=int(self.addr64, 16), addr16=int(self.addr16, 16)))
             print("send")
             ser.flush()
             self.cmd = None
