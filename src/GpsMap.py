@@ -17,7 +17,7 @@ class GpsMap(QGroupBox):
         self.width = r.width()
         self.height = r.height()
         self.view.setParent(self)
-        self.view.setHtml(open(os.path.join(PATH_ASSETS, "map.html"),"r").read())
+        self.view.setHtml(open(os.path.join(PATH_ASSETS, "map.html"), "r").read())
         self.view.setGeometry(0, 0, self.width, self.height)
 
     def resizeEvent(self, event):

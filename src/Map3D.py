@@ -21,7 +21,7 @@ class MainWindow(QMainWindow):
         self.timer.start(8)
 
     def addWidget(self, item, x1, y1, x2, y2):
-        item.setGeometry(x1, y1, x2-x1+1, y2-y1+1)
+        item.setGeometry(x1, y1, x2 - x1 + 1, y2 - y1 + 1)
         item.setParent(self)
         return item
 
@@ -59,7 +59,7 @@ class Map3D(QGroupBox):
     def paintEvent(self, e):
         super().paintEvent(e)
         self.painter = QPainter(self)
-        self.painter.setRenderHint(QPainter.Antialiasing, bool=True)
+        self.painter.setRenderHint(QPainter.Antialiasing, True)
         self.drawPolygon([0, 10, 10, 0], [0, 0, 10, 10], self.fg15)
         self.painter.end()
 

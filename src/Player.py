@@ -34,7 +34,7 @@ class Player(QGroupBox):
         if self.th:
             self.th.width = self.width
             self.th.height = self.height
-        self.label.setGeometry(2, 1, self.width-2, self.height-2)
+        self.label.setGeometry(2, 1, self.width - 2, self.height - 2)
 
     def start_video(self):
         if not self.th and self.cam_index != None:
@@ -50,8 +50,8 @@ class Player(QGroupBox):
         if self.th:
             self.th.exit = True
             if hasattr(self.th, "fcount"):
-                cmd = "ffmpeg -y -r {} -i \"{}\" \"{}\"".format(int(self.th.fcount/(
-                    time()-self.stime)), PATH_VIDEOS_RLATEST, PATH_VIDEOS_LATEST)
+                cmd = "ffmpeg -y -r {} -i \"{}\" \"{}\"".format(int(self.th.fcount / (
+                    time() - self.stime)), PATH_VIDEOS_RLATEST, PATH_VIDEOS_LATEST)
                 print(cmd)
                 os.system(cmd)
                 copyfile(PATH_VIDEOS_LATEST, os.path.join(
@@ -126,7 +126,7 @@ class PlayerThread(QThread):
         cap = cv2.VideoCapture(self.cam_index)
         ret = False
         if self.delay:
-            delay = 1/cap.get(cv2.CAP_PROP_FPS)
+            delay = 1 / cap.get(cv2.CAP_PROP_FPS)
         else:
             delay = 0
         while not ret:
@@ -143,7 +143,7 @@ class PlayerThread(QThread):
                 h, w, ch = rgbImage.shape
                 bytesPerLine = ch * w
                 r = qimage2ndarray.array2qimage(rgbImage)
-                p = r.scaled(self.width-4, self.height-4,
+                p = r.scaled(self.width - 4, self.height - 4,
                              Qt.KeepAspectRatio, Qt.FastTransformation)
                 self.changePixmap.emit(p)
                 del frame

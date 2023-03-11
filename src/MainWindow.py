@@ -31,10 +31,10 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.setWindowTitle("Göksat 1 Yer İstasyonu Yazılımı")
         self.setWindowIcon(QIcon('assets/icon.ico'))
-        self.setGeometry(0, 0, 1366, 768-24)
-        self.maximumSize = (1366, 768-24)
-        self.minimumSize = (1366, 768-24)
-        self.graphs = [None]*(max(map(lambda x: x[2], telemetry.values()))+1)
+        self.setGeometry(0, 0, 1366, 768 - 24)
+        self.maximumSize = (1366, 768 - 24)
+        self.minimumSize = (1366, 768 - 24)
+        self.graphs = [None] * (max(map(lambda x: x[2], telemetry.values())) + 1)
         for t, p in telemetry.items():
             self.addGraph(t, p)
         self.navball = self.addWidget(Navball(), 570, 543, 795, 767)
@@ -75,19 +75,19 @@ class MainWindow(QMainWindow):
         self.stdout_file = StringIO()
         sys.stdout = self.stdout_file
         for i in range(17):
-            self.table.horizontalHeader().setResizeMode(i, QHeaderView.Stretch)
-        self.addWidget(self.table, 0, 308 + 153*3, 6*190 + 225, 1080)
+            self.table.horizontalHeader().setSectionResizeMode(i, QHeaderView.Stretch)
+        self.addWidget(self.table, 0, 308 + 153 * 3, 6 * 190 + 225, 1080)
         self.tth = None
         self.setAcceptDrops(True)
 
     def addWidget(self, item, x1, y1, x2, y2):
-        item.setGeometry(x1, y1-24, x2-x1+1, y2-y1+1)
+        item.setGeometry(x1, y1 - 24, x2 - x1 + 1, y2 - y1 + 1)
         item.setParent(self)
         return item
 
     def addGraph(self, name, p):
         graph = self.addWidget(
-            CustomGraph(name), 0 + 190*p[0] + 225*(p[0] > 2), 155 + 153*p[1], 190 + 190*p[0] + 225*(p[0] > 2), 308 + 153*p[1])
+            CustomGraph(name), 0 + 190 * p[0] + 225 * (p[0] > 2), 155 + 153 * p[1], 190 + 190 * p[0] + 225 * (p[0] > 2), 308 + 153 * p[1])
         self.graphs[p[2]] = graph
         return graph
 
@@ -151,7 +151,7 @@ class MainWindow(QMainWindow):
             self.player.stop_video()
 
     def update_ui(self):
-        self.table.setRowCount(self.pcount+1)
+        self.table.setRowCount(self.pcount + 1)
         r = self.tth.data
         for p in telemetry.values():
             g = self.graphs[p[2]]
@@ -169,7 +169,7 @@ class MainWindow(QMainWindow):
         self.navball.setAngle(r[12][-1], r[13][-1], r[14][-1])
         self.nav2d.setAngle(r[12][-1], r[13][-1], r[14][-1])
         self.gpsmap.setLocation(r[8][-1], r[9][-1])
-        delta = datetime.now()-self.start_date
+        delta = datetime.now() - self.start_date
         delta = datetime(2000, 1, 1) + delta
         self.time_text.setText(f"{delta.minute:02} : {delta.second:02}")
         self.status_text.setText(status[r[11][-1]])

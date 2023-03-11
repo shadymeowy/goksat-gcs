@@ -16,7 +16,7 @@ class CustomGraph(QGroupBox):
         self.title = title
         self.graph = PlotWidget(self, title=title, *args, **kargs)
         r = self.geometry()
-        self.graph.setGeometry(2, 2, r.width()-4-17, r.height()-4)
+        self.graph.setGeometry(2, 2, r.width() - 4 - 17, r.height() - 4)
         self.x = []
         self.y = []
         self.range = [-1, 1]
@@ -27,7 +27,7 @@ class CustomGraph(QGroupBox):
     def resizeEvent(self, e):
         super().resizeEvent(e)
         r = self.geometry()
-        self.graph.setGeometry(2, 2, r.width()-4-17, r.height()-4)
+        self.graph.setGeometry(2, 2, r.width() - 4 - 17, r.height() - 4)
 
     def plot(self):
         rn = self.range
@@ -41,7 +41,7 @@ class CustomGraph(QGroupBox):
         while y[-1] < rn[0]:
             rn[0] *= 2
         self.graph.plotItem.setRange(
-            xRange=(0, (x[-1]//20+1)*20), yRange=rn, disableAutoRange=True)
+            xRange=(0, (x[-1] // 20 + 1) * 20), yRange=rn, disableAutoRange=True)
         self.plotdata.setData(x, y)
 
     def update_style(self, palette=None):
@@ -100,16 +100,16 @@ if __name__ == "__main__":
             self.timer = QTimer(self)
             self.customgraph = CustomGraph("Sine")
             self.customgraph.setParent(self)
-            self.setGeometry(0, 0, 512, 512+256)
-            self.customgraph.setGeometry(0, 0, 512, 512+256)
+            self.setGeometry(0, 0, 512, 512 + 256)
+            self.customgraph.setGeometry(0, 0, 512, 512 + 256)
             self.timer.timeout.connect(self.update_widget)
-            self.timer.start(1000/60)
+            self.timer.start(1000 / 60)
             self.time = 0
 
         def update_widget(self):
-            self.time += 1/60
+            self.time += 1 / 60
             self.customgraph.x = np.linspace(
-                0, self.time, int(self.time*10)+10)
+                0, self.time, int(self.time * 10) + 10)
             self.customgraph.y = np.sin(self.customgraph.x)
             self.customgraph.plot()
 
